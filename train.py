@@ -1,36 +1,9 @@
-"""
-Advanced Training Pipeline for Transformer-Based Melody Generation
+"""Train the repository's compact encoder-decoder melody Transformer.
 
-This sophisticated training system represents the core learning engine that transforms
-our Transformer model into a musically intelligent system capable of generating
-coherent, beautiful melodies. The pipeline implements cutting-edge training techniques
-specifically optimized for musical sequence learning.
-
-The training process leverages our custom Transformer architecture and intelligent
-data preprocessing to teach the model complex musical patterns, relationships, and
-compositional structures. Through advanced loss computation and gradient optimization,
-the model learns to understand and generate musically coherent sequences.
-
-Revolutionary Training Features:
-- Sophisticated loss computation with intelligent padding mask handling
-- Advanced gradient tape implementation for precise backpropagation
-- Optimized Adam optimizer with adaptive learning rates
-- Dynamic sequence padding preserving musical structure
-
-Musical Learning Capabilities:
-- Learns complex melodic patterns and progressions
-- Understands harmonic relationships and musical conventions
-- Develops temporal awareness for rhythmic patterns
-- Acquires compositional knowledge for coherent melody generation
-
-Training Intelligence:
-- Masked loss computation focusing on actual musical content
-- Efficient batch processing for optimal GPU utilization
-- Sophisticated sequence padding maintaining musical integrity
-- Advanced optimization techniques for stable convergence
-
-This training pipeline represents the sophisticated learning process that enables
-our Transformer model to develop deep musical understanding and creative capabilities.
+The script builds a tokenized ``tf.data`` input pipeline, optimizes a masked
+cross-entropy objective for ten epochs, and prints one autoregressive example.
+The bundled dataset is intentionally small, so the output is a learning
+artifact rather than evidence of production-quality music generation.
 """
 
 import tensorflow as tf
@@ -99,7 +72,14 @@ def _train_step(input, target, transformer):
         # Forward pass through the transformer model
         # TODO: Add padding mask for encoder + decoder and look-ahead mask
         # for decoder
-        predictions = transformer(input, target_input, True, None, None, None)
+        predictions = transformer(
+            input,
+            target_input,
+            training=True,
+            enc_padding_mask=None,
+            look_ahead_mask=None,
+            dec_padding_mask=None,
+        )
 
         # Compute loss between the real output and the predictions
         loss = _calculate_loss(target_real, predictions)

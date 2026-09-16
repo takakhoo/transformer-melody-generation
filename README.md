@@ -38,6 +38,10 @@ python train.py
 defined at the bottom of the file. Adjust `EPOCHS`, `BATCH_SIZE`, or the model
 dimensions near the top of `train.py` for experiments.
 
+The full default run is intentionally small enough for a CPU smoke test. On a
+recent Apple Silicon laptop it completes ten epochs in seconds; exact loss and
+generated notes vary because training is not seeded.
+
 ## Repository map
 
 | File | Responsibility |
@@ -62,7 +66,9 @@ dimensions near the top of `train.py` for experiments.
 
 ```bash
 python -m compileall -q .
+python train.py
 ```
 
-This project is based on the Transformer melody-generation material from
+Both commands were verified with TensorFlow 2.21 / Keras 3. This project is
+based on the Transformer melody-generation material from
 [The Sound of AI](https://www.youtube.com/@ValerioVelardoTheSoundofAI).
