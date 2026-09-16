@@ -26,8 +26,8 @@ one quarter-note beat).
 ## Quick start
 
 ```bash
-git clone https://github.com/takakhoo/Transformer-Melody-Generation.git
-cd Transformer-Melody-Generation
+git clone https://github.com/takakhoo/transformer-melody-generation.git
+cd transformer-melody-generation
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 python -m pip install -r requirements.txt
@@ -69,6 +69,7 @@ python -m compileall -q .
 python train.py
 ```
 
-Both commands were verified with TensorFlow 2.21 / Keras 3. This project is
+Both commands and the complete ten-epoch run were verified with TensorFlow
+2.21 / Keras 3 on September 16, 2026. This project is
 based on the Transformer melody-generation material from
 [The Sound of AI](https://www.youtube.com/@ValerioVelardoTheSoundofAI).
