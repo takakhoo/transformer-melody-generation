@@ -1,1 +1,1 @@
-tensorflow>=2.15
+-r requirements-reproduce.txt

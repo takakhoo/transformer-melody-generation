@@ -1,0 +1,11 @@
+{
+  "num_layers": 1,
+  "d_model": 32,
+  "num_heads": 2,
+  "d_feedforward": 64,
+  "input_vocab_size": 23,
+  "target_vocab_size": 23,
+  "max_num_positions_in_pe_encoder": 100,
+  "max_num_positions_in_pe_decoder": 100,
+  "dropout_rate": 0.1
+}

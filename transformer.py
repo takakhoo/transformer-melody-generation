@@ -1,510 +1,115 @@
-"""
-Advanced Transformer Architecture for Musical Sequence Generation
+"""A small, causal two-stack Transformer for next-note prediction.
 
-This implementation represents a cutting-edge adaptation of the Transformer model
-specifically engineered for generating musical melodies. By leveraging the revolutionary
-attention mechanism, this model can understand complex musical relationships and
-generate coherent, musically intelligent sequences.
-
-The architecture implements a complete encoder-decoder structure with multi-head
-attention, allowing the model to focus on different aspects of musical context
-simultaneously. The sinusoidal positional encoding ensures temporal relationships
-between musical notes are preserved and understood by the model.
-
-Core Architecture Components:
-- Transformer: Main orchestrator combining encoder and decoder for end-to-end learning
-- Encoder: Processes musical input sequences into rich contextual representations
-- Decoder: Generates new musical sequences based on encoder context and autoregressive input
-- EncoderLayer/DecoderLayer: Individual processing units with attention and feed-forward networks
-- Positional Encoding: Sophisticated sinusoidal encoding preserving musical timing information
-
-Musical Intelligence Features:
-- Multi-head attention captures harmonic and melodic relationships
-- Positional encoding maintains rhythmic and temporal structure
-- Layer normalization ensures stable learning of musical patterns
-- Feed-forward networks add non-linear musical transformations
-
-This implementation represents a sophisticated fusion of deep learning and music theory,
-enabling the generation of musically coherent melodies through advanced sequence modeling.
+Both stacks read the same note prefix. Unlike translation, the encoder must
+also be causal: an unmasked encoder would leak future labels through cross
+attention even if decoder self-attention were masked.
 """
 
 import numpy as np
 import tensorflow as tf
-from keras.layers import (
-    Dense,
-    Dropout,
-    Embedding,
-    LayerNormalization,
-    MultiHeadAttention,
-)
+from keras.layers import Dense, Dropout, Embedding, LayerNormalization, MultiHeadAttention
 
 
 def sinusoidal_position_encoding(num_positions, d_model):
-    """
-    Generates sophisticated positional encodings using sinusoidal functions to preserve
-    temporal information in musical sequences. This encoding allows the model to understand
-    the relative position of each musical note in the sequence, crucial for maintaining
-    rhythmic and melodic coherence.
-
-    Parameters:
-        num_positions (int): Maximum sequence length the model can handle
-        d_model (int): Embedding dimension of the model
-
-    Returns:
-        Tensor: Rich positional encoding matrix preserving musical timing relationships
-    """
-
-    angles = _get_angles(
-        np.arange(num_positions)[:, np.newaxis],
-        np.arange(d_model)[np.newaxis, :],
-        d_model,
+    if num_positions < 1 or d_model < 1:
+        raise ValueError("Position count and model width must be positive")
+    angles = np.arange(num_positions)[:, None] / np.power(
+        10000, 2 * (np.arange(d_model)[None, :] // 2) / d_model
     )
-
-    # Apply sin to even indices in the array; 2i
-    sines = np.sin(angles[:, 0::2])
-
-    # Apply cos to odd indices in the array; 2i+1
-    cosines = np.cos(angles[:, 1::2])
-
-    pos_encoding = np.concatenate([sines, cosines], axis=-1)
-    pos_encoding = pos_encoding[np.newaxis, ...]  # (1, position, d_model)
-
-    return tf.cast(pos_encoding, dtype=tf.float32)
+    values = np.empty_like(angles)
+    values[:, 0::2] = np.sin(angles[:, 0::2])
+    values[:, 1::2] = np.cos(angles[:, 1::2])
+    return tf.constant(values[None], dtype=tf.float32)
 
 
-def _get_angles(pos, i, d_model):
-    """
-    Calculates the mathematical angles used in sinusoidal positional encoding.
-    This function implements the core mathematical foundation that enables the
-    model to understand temporal relationships in musical sequences.
+def causal_padding_mask(keys, query_length):
+    """Keras masks use True for allowed (not blocked) attention positions."""
+    causal = tf.range(tf.shape(keys)[1])[None, :] <= tf.range(query_length)[:, None]
+    return causal[None] & tf.not_equal(keys[:, None, :], 0)
 
-    Parameters:
-        pos (np.ndarray): Position indices in the sequence
-        i (np.ndarray): Dimension indices for the encoding
-        d_model (int): Model embedding dimension
 
-    Returns:
-        np.ndarray: Computed angles for sinusoidal positional encoding
-    """
-    angle_dropout_rates = 1 / np.power(
-        10000, (2 * (i // 2)) / np.float32(d_model)
-    )
-    return pos * angle_dropout_rates
+class AttentionBlock(tf.keras.layers.Layer):
+    def __init__(self, d_model, num_heads, d_feedforward, dropout_rate, cross=False):
+        super().__init__()
+        self.attention = MultiHeadAttention(num_heads=num_heads, key_dim=d_model // num_heads)
+        self.cross_attention = (
+            MultiHeadAttention(num_heads=num_heads, key_dim=d_model // num_heads) if cross else None
+        )
+        self.ffn = tf.keras.Sequential([Dense(d_feedforward, activation="relu"), Dense(d_model)])
+        self.norm1 = LayerNormalization(epsilon=1e-6)
+        self.norm2 = LayerNormalization(epsilon=1e-6)
+        self.norm3 = LayerNormalization(epsilon=1e-6) if cross else None
+        self.drop1 = Dropout(dropout_rate)
+        self.drop2 = Dropout(dropout_rate)
+        self.drop3 = Dropout(dropout_rate) if cross else None
+
+    def call(self, x, attention_mask, context=None, cross_mask=None, training=False):
+        attended = self.attention(x, x, attention_mask=attention_mask, training=training)
+        x = self.norm1(x + self.drop1(attended, training=training))
+        if self.cross_attention is not None:
+            attended = self.cross_attention(x, context, attention_mask=cross_mask, training=training)
+            x = self.norm3(x + self.drop3(attended, training=training))
+        return self.norm2(x + self.drop2(self.ffn(x), training=training))
 
 
 class Transformer(tf.keras.Model):
-    """
-    Revolutionary Transformer architecture specifically designed for musical sequence generation.
-    This model combines the power of attention mechanisms with sophisticated musical understanding
-    to create coherent, musically intelligent melodies through advanced deep learning techniques.
-    """
+    """Predict x[t+1] using only x[:t+1]; token 0 is padding."""
 
-    def __init__(
-        self,
-        num_layers,
-        d_model,
-        num_heads,
-        d_feedforward,
-        input_vocab_size,
-        target_vocab_size,
-        max_num_positions_in_pe_encoder,
-        max_num_positions_in_pe_decoder,
-        dropout_rate=0.1,
-    ):
-        """
-        Parameters:
-            num_layers (int): Number of layers in both Encoder and Decoder.
-            d_model (int): Dimension of the model.
-            num_heads (int): Number of attention heads.
-            d_feedforward (int): Dimension of the feed forward network.
-            input_vocab_size (int): Size of the input vocabulary.
-            target_vocab_size (int): Size of the target vocabulary.
-            max_num_positions_in_pe_encoder (int): The maximum positions for input.
-            max_num_positions_in_pe_decoder (int): The maximum positions for
-                target.
-            dropout_rate (float): Dropout dropout_rate.
-        """
-        super(Transformer, self).__init__()
-        self.encoder = Encoder(
-            num_layers,
-            d_model,
-            num_heads,
-            d_feedforward,
-            input_vocab_size,
-            max_num_positions_in_pe_encoder,
-            dropout_rate,
+    def __init__(self, num_layers, d_model, num_heads, d_feedforward,
+                 input_vocab_size, target_vocab_size,
+                 max_num_positions_in_pe_encoder, max_num_positions_in_pe_decoder,
+                 dropout_rate=0.1):
+        super().__init__()
+        if min(num_layers, d_model, num_heads, d_feedforward) < 1 or d_model % num_heads:
+            raise ValueError("Positive dimensions required; d_model must be divisible by num_heads")
+        if min(input_vocab_size, target_vocab_size) < 2 or not 0 <= dropout_rate < 1:
+            raise ValueError("Invalid vocabulary or dropout")
+        self.model_config = dict(
+            num_layers=num_layers, d_model=d_model, num_heads=num_heads,
+            d_feedforward=d_feedforward, input_vocab_size=input_vocab_size,
+            target_vocab_size=target_vocab_size,
+            max_num_positions_in_pe_encoder=max_num_positions_in_pe_encoder,
+            max_num_positions_in_pe_decoder=max_num_positions_in_pe_decoder,
+            dropout_rate=dropout_rate,
         )
-        self.decoder = Decoder(
-            num_layers,
-            d_model,
-            num_heads,
-            d_feedforward,
-            target_vocab_size,
-            max_num_positions_in_pe_decoder,
-            dropout_rate,
-        )
-
+        self.enc_embedding = Embedding(input_vocab_size, d_model)
+        self.dec_embedding = Embedding(target_vocab_size, d_model)
+        self.enc_pe = sinusoidal_position_encoding(max_num_positions_in_pe_encoder, d_model)
+        self.dec_pe = sinusoidal_position_encoding(max_num_positions_in_pe_decoder, d_model)
+        self.enc_blocks = [AttentionBlock(d_model, num_heads, d_feedforward, dropout_rate)
+                           for _ in range(num_layers)]
+        self.dec_blocks = [AttentionBlock(d_model, num_heads, d_feedforward, dropout_rate, cross=True)
+                           for _ in range(num_layers)]
+        self.enc_dropout, self.dec_dropout = Dropout(dropout_rate), Dropout(dropout_rate)
         self.final_layer = Dense(target_vocab_size)
+        self.scale = tf.math.sqrt(tf.cast(d_model, tf.float32))
 
-    def call(
-        self,
-        input,
-        target,
-        training,
-        enc_padding_mask,
-        look_ahead_mask,
-        dec_padding_mask,
-    ):
-        """
-        Process the input through the Transformer model.
-
-        Parameters:
-            input (Tensor): Input tensor to the Encoder.
-            target (Tensor): Target tensor for the Decoder.
-            training (bool): Whether the layer should behave in training mode.
-            enc_padding_mask (Tensor): Padding mask for the Encoder.
-            look_ahead_mask (Tensor): Look-ahead mask for the Decoder.
-            dec_padding_mask (Tensor): Padding mask for the Decoder.
-
-        Returns:
-            Tensor: The final output of the Transformer.
-            dict: Attention weights from the Decoder layers.
-        """
-        enc_output = self.encoder(
-            input, training=training, mask=enc_padding_mask
-        )  # (batch_size, input_seq_len, d_model)
-
-        dec_output = self.decoder(
-            target,
-            enc_output,
-            training=training,
-            look_ahead_mask=look_ahead_mask,
-            padding_mask=dec_padding_mask,
-        )  # (batch_size, tar_seq_len, d_model)
-
-        logits = self.final_layer(
-            dec_output
-        )  # (batch_size, target_seq_len, target_vocab_size)
-
-        return logits
-
-
-class Encoder(tf.keras.layers.Layer):
-    """
-    The Encoder of a Transformer model, consisting of multiple EncoderLayers.
-    """
-
-    def __init__(
-        self,
-        num_layers,
-        d_model,
-        num_heads,
-        d_feedforward,
-        input_vocab_size,
-        maximum_positions_in_pe,
-        dropout_rate=0.1,
-    ):
-        """
-        Parameters
-            num_layers (int): Number of EncoderLayers.
-            d_model (int): Dimension of the model.
-            num_heads (int): Number of attention heads.
-            d_feedforward (int): Dimension of the feed forward network.
-            input_vocab_size (int): Size of the input vocabulary.
-            maximum_positions_in_pe (int): The maximum sequence length that
-                this model might ever be used with.
-            dropout_rate (float): Dropout dropout_rate.
-        """
-        super(Encoder, self).__init__()
-        self.d_model = d_model
-        self.num_layers = num_layers
-
-        self.embedding = Embedding(input_vocab_size, d_model)
-        self.pos_encoding = sinusoidal_position_encoding(
-            maximum_positions_in_pe, d_model
-        )
-        self.enc_layers = [
-            EncoderLayer(d_model, num_heads, d_feedforward, dropout_rate)
-            for _ in range(num_layers)
-        ]
-        self.dropout = Dropout(dropout_rate)
-
-    def call(self, x, training, mask):
-        """
-        Process the input through the Encoder.
-
-        Args:
-            x (Tensor): Input tensor.
-            training (bool): Whether the layer should behave in training mode.
-            mask (Tensor): Mask to be applied on attention weights.
-
-        Returns:
-            Tensor: Output of the Encoder.
-        """
-        x = self.embedding(x)  # (batch_size, input_seq_len, d_model)
-        x *= tf.math.sqrt(tf.cast(self.d_model, tf.float32))
-
-        sliced_pos_encoding = self._get_sliced_positional_encoding(x)
-        x += sliced_pos_encoding
-
-        x = self.dropout(x, training=training)
-
-        for i in range(self.num_layers):
-            x = self.enc_layers[i](x, training=training, mask=mask)
-
-        return x  # (batch_size, input_seq_len, d_model)
-
-    def _get_sliced_positional_encoding(self, x):
-        """
-        Get a slice of the full positional encoding.
-
-        Patameters:
-            x (Tensor): Input tensor.
-
-        Returns:
-            Tensor: A slice of the full positional encoding.
-        """
-        number_of_tokens = x.shape[1]
-        return self.pos_encoding[:, :number_of_tokens, :]
-
-
-class Decoder(tf.keras.layers.Layer):
-    """
-    The Decoder of a Transformer model, consisting of multiple DecoderLayers.
-    """
-
-    def __init__(
-        self,
-        num_layers,
-        d_model,
-        num_heads,
-        d_feedforward,
-        target_vocab_size,
-        maximum_positions_in_pe,
-        dropout_rate=0.1,
-    ):
-        """
-        Parameters:
-            num_layers (int): Number of DecoderLayers.
-            d_model (int): Dimension of the model.
-            num_heads (int): Number of attention heads.
-            d_feedforward (int): Dimension of the feed forward network.
-            target_vocab_size (int): Size of the target vocabulary.
-            maximum_positions_in_pe (int): The maximum sequence length that
-                this model might ever be used with.
-            dropout_rate (float): Dropout dropout_rate.
-        """
-        super(Decoder, self).__init__()
-        self.d_model = d_model
-        self.num_layers = num_layers
-
-        self.embedding = Embedding(target_vocab_size, d_model)
-        self.pos_encoding = sinusoidal_position_encoding(
-            maximum_positions_in_pe, d_model
-        )
-
-        self.dec_layers = [
-            DecoderLayer(d_model, num_heads, d_feedforward, dropout_rate)
-            for _ in range(num_layers)
-        ]
-        self.dropout = Dropout(dropout_rate)
-
-    def call(self, x, enc_output, training, look_ahead_mask, padding_mask):
-        """
-        Process the input through the Decoder.
-
-        Parameters:
-            x (Tensor): Input tensor to the Decoder.
-            enc_output (Tensor): Output from the Encoder.
-            training (bool): Whether the layer should behave in training mode.
-            look_ahead_mask (Tensor): Mask for the first MultiHeadAttention layer.
-            padding_mask (Tensor): Mask for the second MultiHeadAttention layer.
-
-        Returns:
-            Tensor: The output of the Decoder.
-        """
-
-        x = self.embedding(x)  # (batch_size, target_seq_len, d_model)
-        x *= tf.math.sqrt(tf.cast(self.d_model, tf.float32))
-
-        sliced_pos_encoding = self._get_sliced_positional_encoding(x)
-        x += sliced_pos_encoding
-
-        x = self.dropout(x, training=training)
-
-        for i in range(self.num_layers):
-            x = self.dec_layers[i](
-                x,
-                enc_output,
-                training=training,
-                look_ahead_mask=look_ahead_mask,
-                padding_mask=padding_mask,
-            )
-
-        return x
-
-    def _get_sliced_positional_encoding(self, x):
-        """
-        Get a slice of the full positional encoding.
-
-        Patameters:
-            x (Tensor): Input tensor.
-
-        Returns:
-            Tensor: A slice of the full positional encoding.
-        """
-        number_of_tokens = x.shape[1]
-        return self.pos_encoding[:, :number_of_tokens, :]
-
-
-class EncoderLayer(tf.keras.layers.Layer):
-    """
-    Encoder Layer of a Transformer, consisting of MultiHeadAttention and
-    Feed Forward Neural Network.
-    """
-
-    def __init__(self, d_model, num_heads, d_feedforward, dropout_rate=0.1):
-        """
-        Parameters:
-            d_model (int): Dimension of the model.
-            num_heads (int): Number of attention heads.
-            d_feedforward (int): Dimension of the feed forward network.
-            dropout_rate (float): Dropout dropout_rate.
-        """
-        super(EncoderLayer, self).__init__()
-        self.mha = MultiHeadAttention(key_dim=d_model, num_heads=num_heads)
-        self.ffn = tf.keras.Sequential(
-            [Dense(d_feedforward, activation="relu"), Dense(d_model)]
-        )
-        self.layernorm1 = LayerNormalization(epsilon=1e-6)
-        self.layernorm2 = LayerNormalization(epsilon=1e-6)
-        self.dropout1 = Dropout(dropout_rate)
-        self.dropout2 = Dropout(dropout_rate)
-
-    def call(self, x, training, mask):
-        """
-        Process the input through the Encoder layer.
-
-        Parameters:
-            x (Tensor): Input tensor.
-            training (bool): Whether the layer should behave in training mode.
-            mask (Tensor): Mask to be applied on attention weights.
-
-        Returns:
-            Tensor: Output of the Encoder layer.
-        """
-        attn_output = self.mha(x, x, x, attention_mask=mask)
-        attn_output = self.dropout1(attn_output, training=training)
-        out1 = self.layernorm1(x + attn_output)
-
-        ffn_output = self.ffn(out1)
-        ffn_output = self.dropout2(ffn_output, training=training)
-        out2 = self.layernorm2(out1 + ffn_output)
-
-        return out2
-
-
-class DecoderLayer(tf.keras.layers.Layer):
-    """
-    Decoder Layer of a Transformer, consisting of two MultiHeadAttention
-    layers and a Feed Forward Neural Network.
-    """
-
-    def __init__(self, d_model, num_heads, d_feedforward, dropout_rate=0.1):
-        """
-        Parameters:
-            d_model (int): Dimension of the model.
-            num_heads (int): Number of attention heads.
-            d_feedforward (int): Dimension of the feed forward network.
-            dropout_rate (float): Dropout dropout_rate.
-        """
-        super(DecoderLayer, self).__init__()
-        self.mha1 = MultiHeadAttention(key_dim=d_model, num_heads=num_heads)
-        self.mha2 = MultiHeadAttention(key_dim=d_model, num_heads=num_heads)
-
-        self.ffn = tf.keras.Sequential(
-            [Dense(d_feedforward, activation="relu"), Dense(d_model)]
-        )
-        self.layernorm1 = LayerNormalization(epsilon=1e-6)
-        self.layernorm2 = LayerNormalization(epsilon=1e-6)
-        self.layernorm3 = LayerNormalization(epsilon=1e-6)
-        self.dropout1 = Dropout(dropout_rate)
-        self.dropout2 = Dropout(dropout_rate)
-        self.dropout3 = Dropout(dropout_rate)
-
-    def call(self, x, enc_output, training, look_ahead_mask, padding_mask):
-        """
-        Process the input through the Decoder layer.
-
-        Parameters
-            x (Tensor): Input tensor to the Decoder layer.
-            enc_output (Tensor): Output from the Encoder.
-            training (bool): Whether the layer should behave in training mode.
-            look_ahead_mask (Tensor): Mask for the first MultiHeadAttention layer.
-            padding_mask (Tensor): Mask for the second MultiHeadAttention layer.
-
-        Returns:
-            Tensor: The output of the Decoder layer.
-        """
-        attn1 = self.mha1(x, x, x, attention_mask=look_ahead_mask)
-        attn1 = self.dropout1(attn1, training=training)
-        out1 = self.layernorm1(attn1 + x)
-
-        attn2 = self.mha2(
-            out1, enc_output, enc_output, attention_mask=padding_mask
-        )
-        attn2 = self.dropout2(attn2, training=training)
-        out2 = self.layernorm2(attn2 + out1)
-
-        ffn_output = self.ffn(out2)
-        ffn_output = self.dropout3(ffn_output, training=training)
-        out3 = self.layernorm3(ffn_output + out2)
-
-        return out3
-
-
-if __name__ == "__main__":
-    # Define Transformer parameters
-    num_layers = 2
-    d_model = 64
-    num_heads = 2
-    d_feedforward = 128
-    input_vocab_size = 100
-    target_vocab_size = 100
-    dropout_dropout_rate = 0.1
-    pe_input = 10
-    pe_target = 10
-
-    # Instantiate the Transformer model
-    transformer_model = Transformer(
-        num_layers,
-        d_model,
-        num_heads,
-        d_feedforward,
-        input_vocab_size,
-        target_vocab_size,
-        pe_input,
-        pe_target,
-        dropout_dropout_rate,
-    )
-
-    # Dummy input shapes for encoder and decoder
-    dummy_inp = tf.random.uniform(
-        (1, 10), dtype=tf.int64, minval=0, maxval=input_vocab_size
-    )
-    dummy_tar = tf.random.uniform(
-        (1, 10), dtype=tf.int64, minval=0, maxval=target_vocab_size
-    )
-
-    # Build the model using dummy input
-    transformer_model(
-        dummy_inp,
-        dummy_tar,
-        training=False,
-        enc_padding_mask=None,
-        look_ahead_mask=None,
-        dec_padding_mask=None,
-    )
-
-    # Display the model summary
-    transformer_model.summary()
+    def call(self, input, target=None, training=False, enc_padding_mask=None,
+             look_ahead_mask=None, dec_padding_mask=None):
+        # Optional masks may restrict attention further, never remove causality.
+        target = input if target is None else target
+        tf.debugging.assert_equal(tf.shape(input), tf.shape(target),
+                                  message="Both stacks require aligned note prefixes")
+        length = tf.shape(input)[1]
+        tf.debugging.assert_positive(length)
+        tf.debugging.assert_less_equal(length, tf.shape(self.enc_pe)[1])
+        tf.debugging.assert_less_equal(length, tf.shape(self.dec_pe)[1])
+        enc_mask = causal_padding_mask(input, length)
+        dec_mask = causal_padding_mask(target, length)
+        cross_mask = causal_padding_mask(input, length)
+        if enc_padding_mask is not None:
+            enc_mask &= tf.cast(enc_padding_mask, tf.bool)
+        if look_ahead_mask is not None:
+            dec_mask &= tf.cast(look_ahead_mask, tf.bool)
+        if dec_padding_mask is not None:
+            cross_mask &= tf.cast(dec_padding_mask, tf.bool)
+        encoded = self.enc_dropout(self.enc_embedding(input) * self.scale + self.enc_pe[:, :length],
+                                   training=training)
+        for block in self.enc_blocks:
+            encoded = block(encoded, attention_mask=enc_mask, training=training)
+        decoded = self.dec_dropout(self.dec_embedding(target) * self.scale + self.dec_pe[:, :length],
+                                   training=training)
+        for block in self.dec_blocks:
+            decoded = block(decoded, attention_mask=dec_mask, context=encoded,
+                            cross_mask=cross_mask, training=training)
+        return self.final_layer(decoded)

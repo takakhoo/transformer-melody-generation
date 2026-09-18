@@ -1,169 +1,141 @@
-"""Train the repository's compact encoder-decoder melody Transformer.
+"""Reproduce a small, leakage-free next-note experiment and export MIDI."""
 
-The script builds a tokenized ``tf.data`` input pipeline, optimizes a masked
-cross-entropy objective for ten epochs, and prints one autoregressive example.
-The bundled dataset is intentionally small, so the output is a learning
-artifact rather than evidence of production-quality music generation.
-"""
-
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import numpy as np
 import tensorflow as tf
-from keras.losses import SparseCategoricalCrossentropy
-from keras.optimizers import Adam
-from melodygenerator import MelodyGenerator
+from melodygenerator import MelodyGenerator, write_midi
 from melodypreprocessor import MelodyPreprocessor
 from transformer import Transformer
 
-# Advanced Training Configuration Parameters
-EPOCHS = 10                    # Number of complete training cycles through the dataset
-BATCH_SIZE = 32               # Optimal batch size for GPU memory efficiency
-DATA_PATH = "dataset.json"    # Path to our musical training dataset
-MAX_POSITIONS_IN_POSITIONAL_ENCODING = 100  # Maximum sequence length for positional encoding
-
-# Sophisticated Loss Function and Optimizer Configuration
-sparse_categorical_crossentropy = SparseCategoricalCrossentropy(
-    from_logits=True, reduction="none"  # Advanced loss computation for musical sequences
-)
-optimizer = Adam()  # Adaptive learning rate optimizer for stable musical learning
-
-
-def train(train_dataset, transformer, epochs):
-    """
-    Trains the Transformer model on a given dataset for a specified number of epochs.
-
-    Parameters:
-        train_dataset (tf.data.Dataset): The training dataset.
-        transformer (Transformer): The Transformer model instance.
-        epochs (int): The number of epochs to train the model.
-    """
-    print("Training the model...")
-    for epoch in range(epochs):
-        total_loss = 0
-        # Iterate over each batch in the training dataset
-        for (batch, (input, target)) in enumerate(train_dataset):
-            # Perform a single training step
-            batch_loss = _train_step(input, target, transformer)
-            total_loss += batch_loss
-            print(
-                f"Epoch {epoch + 1} Batch {batch + 1} Loss {batch_loss.numpy()}"
-            )
-
-
-@tf.function
-def _train_step(input, target, transformer):
-    """
-    Performs a single training step for the Transformer model.
-
-    Parameters:
-        input (tf.Tensor): The input sequences.
-        target (tf.Tensor): The target sequences.
-        transformer (Transformer): The Transformer model instance.
-
-    Returns:
-        tf.Tensor: The loss value for the training step.
-    """
-    # Prepare the target input and real output for the decoder
-    # Pad the sequences on the right by one position
-    target_input = _right_pad_sequence_once(target[:, :-1])
-    target_real = _right_pad_sequence_once(target[:, 1:])
-
-    # Open a GradientTape to record the operations run
-    # during the forward pass, which enables auto-differentiation
-    with tf.GradientTape() as tape:
-        # Forward pass through the transformer model
-        # TODO: Add padding mask for encoder + decoder and look-ahead mask
-        # for decoder
-        predictions = transformer(
-            input,
-            target_input,
-            training=True,
-            enc_padding_mask=None,
-            look_ahead_mask=None,
-            dec_padding_mask=None,
-        )
-
-        # Compute loss between the real output and the predictions
-        loss = _calculate_loss(target_real, predictions)
-
-    # Calculate gradients with respect to the model's trainable variables
-    gradients = tape.gradient(loss, transformer.trainable_variables)
-
-    # Apply gradients to update the model's parameters
-    gradient_variable_pairs = zip(gradients, transformer.trainable_variables)
-    optimizer.apply_gradients(gradient_variable_pairs)
-
-    # Return the computed loss for this training step
-    return loss
-
 
 def _calculate_loss(real, pred):
-    """
-    Computes the loss between the real and predicted sequences.
-
-    Parameters:
-        real (tf.Tensor): The actual target sequences.
-        pred (tf.Tensor): The predicted sequences by the model.
-
-    Returns:
-        average_loss (tf.Tensor): The computed loss value.
-    """
-
-    # Compute loss using the Sparse Categorical Crossentropy
-    loss_ = sparse_categorical_crossentropy(real, pred)
-
-    # Create a mask to filter out zeros (padded values) in the real sequences
-    boolean_mask = tf.math.equal(real, 0)
-    mask = tf.math.logical_not(boolean_mask)
-
-    # Convert mask to the same dtype as the loss for multiplication
-    mask = tf.cast(mask, dtype=loss_.dtype)
-
-    # Apply the mask to the loss, ignoring losses on padded positions
-    loss_ *= mask
-
-    # Calculate average loss, excluding the padded positions
-    total_loss = tf.reduce_sum(loss_)
-    number_of_non_padded_elements = tf.reduce_sum(mask)
-    average_loss = total_loss / number_of_non_padded_elements
-
-    return average_loss
+    losses = tf.keras.losses.sparse_categorical_crossentropy(real, pred, from_logits=True)
+    mask = tf.cast(real != 0, losses.dtype)
+    return tf.math.divide_no_nan(tf.reduce_sum(losses * mask), tf.reduce_sum(mask))
 
 
-def _right_pad_sequence_once(sequence):
-    """
-    Pads a sequence with a single zero at the end.
+def evaluate(model, x, y):
+    logits = model(x, training=False)
+    loss = float(_calculate_loss(y, logits))
+    mask = y != 0
+    accuracy = float(np.mean(np.argmax(logits.numpy(), axis=-1)[mask] == y[mask]))
+    return {"cross_entropy": loss, "perplexity": float(np.exp(loss)), "accuracy": accuracy}
 
-    Parameters:
-        sequence (tf.Tensor): The sequence to be padded.
 
-    Returns:
-        tf.Tensor: The padded sequence.
-    """
-    return tf.pad(sequence, [[0, 0], [0, 1]], "CONSTANT")
+def bigram_baseline(x, y, test_x, test_y, vocab_size):
+    counts = np.ones((vocab_size, vocab_size), dtype=float)  # Add-one smoothing.
+    counts[:, 0] = 0
+    for previous, following in zip(x.ravel(), y.ravel()):
+        if following:
+            counts[previous, following] += 1
+    probabilities = counts / counts.sum(axis=1, keepdims=True)
+    mask = test_y != 0
+    loss = float(-np.log(probabilities[test_x[mask], test_y[mask]]).mean())
+    accuracy = float((np.argmax(probabilities[test_x[mask]], axis=-1) == test_y[mask]).mean())
+    return {"cross_entropy": loss, "perplexity": float(np.exp(loss)), "accuracy": accuracy}
+
+
+def load_artifact(directory):
+    from tensorflow.keras.preprocessing.text import tokenizer_from_json
+    directory = Path(directory)
+    model = Transformer(**json.loads((directory / "model_config.json").read_text()))
+    model(tf.constant([[1, 1]]), training=False)
+    model.load_weights(directory / "model.weights.h5")
+    tokenizer = tokenizer_from_json((directory / "tokenizer.json").read_text())
+    return model, tokenizer
+
+
+def run(dataset_path="dataset.json", output="results", epochs=200, seed=7):
+    if epochs < 1:
+        raise ValueError("epochs must be positive")
+    tf.keras.utils.set_random_seed(seed)
+    tf.config.experimental.enable_op_determinism()
+    tf.config.threading.set_inter_op_parallelism_threads(1)
+    tf.config.threading.set_intra_op_parallelism_threads(1)
+    preprocessor = MelodyPreprocessor(dataset_path, seed=seed)
+    raw = preprocessor._load_dataset()
+    melodies = [preprocessor._parse_melody(m) for m in raw]
+    if len(melodies) < 2:
+        raise ValueError("Need separate training and held-out melodies")
+    # Split whole melodies, never overlapping windows. Melody 0 is fixed as
+    # held-out before training: its notes all exist in the other five melodies.
+    # Vocabulary is fitted on training data only.
+    train_melodies, held_melodies = melodies[1:], melodies[:1]
+    preprocessor.tokenizer.fit_on_texts(train_melodies)
+    unknown = set(held_melodies[0]) - set(preprocessor.tokenizer.word_index)
+    if unknown:
+        raise ValueError(f"Held-out notes absent from training vocabulary: {sorted(unknown)}")
+    x, y = preprocessor._create_sequence_pairs(preprocessor.tokenizer.texts_to_sequences(train_melodies))
+    vx, vy = preprocessor._create_sequence_pairs(preprocessor.tokenizer.texts_to_sequences(held_melodies))
+    vocab_size = len(preprocessor.tokenizer.word_index) + 1
+    model = Transformer(1, 32, 2, 64, vocab_size, vocab_size, 100, 100, dropout_rate=0.1)
+    optimizer = tf.keras.optimizers.Adam(0.003, clipnorm=1.0)
+
+    @tf.function
+    def step(inputs, targets):
+        with tf.GradientTape() as tape:
+            loss = _calculate_loss(targets, model(inputs, training=True))
+        gradients = tape.gradient(loss, model.trainable_variables)
+        optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+        return loss
+
+    history = [{"epoch": 0, "train": evaluate(model, x, y), "held_out": evaluate(model, vx, vy)}]
+    for epoch in range(1, epochs + 1):
+        step(x, y)
+        if epoch % 10 == 0 or epoch == epochs:
+            row = {"epoch": epoch, "train": evaluate(model, x, y), "held_out": evaluate(model, vx, vy)}
+            history.append(row)
+            print(f"epoch {epoch}: train CE={row['train']['cross_entropy']:.3f}, held-out CE={row['held_out']['cross_entropy']:.3f}")
+    out = Path(output)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "model_config.json").write_text(json.dumps(model.model_config, indent=2) + "\n")
+    (out / "tokenizer.json").write_text(preprocessor.tokenizer.to_json() + "\n")
+    model.save_weights(out / "model.weights.h5")
+    restored, tokenizer = load_artifact(out)
+    round_trip_error = float(np.abs(model(vx).numpy() - restored(vx).numpy()).max())
+    if round_trip_error > 1e-6:
+        raise AssertionError("Reloaded checkpoint changed predictions")
+    generator = MelodyGenerator(restored, tokenizer, max_length=32)
+    prompt = ["C4-1.0", "D4-1.0", "E4-1.0", "C4-1.0"]
+    samples = {}
+    for name, temperature in [("greedy", 0), ("sampled", 0.8)]:
+        generated = generator.generate(prompt, temperature=temperature, top_k=5, seed=seed)
+        samples[name] = generated
+        write_midi(generated.split(), out / f"{name}.mid")
+    result = dict(
+        description="Six bundled melodies; five training, one held out. Educational, not a music-quality benchmark.",
+        seed=seed, epochs=epochs, tensorflow=tf.__version__, parameters=model.count_params(),
+        dataset_sha256=hashlib.sha256(Path(dataset_path).read_bytes()).hexdigest(),
+        train_indices=list(range(1, len(melodies))), held_out_indices=[0],
+        train_notes=int(np.sum(y != 0)), held_out_notes=int(np.sum(vy != 0)),
+        vocabulary_size_excluding_pad=vocab_size - 1, model_config=model.model_config,
+        bigram_held_out=bigram_baseline(x, y, vx, vy, vocab_size),
+        history=history, checkpoint_max_abs_error=round_trip_error, prompt=prompt, samples=samples,
+    )
+    (out / "metrics.json").write_text(json.dumps(result, indent=2) + "\n")
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(8, 4.5), layout="constrained")
+    for key, label in [("train", "Training melodies"), ("held_out", "Held-out melody")]:
+        ax.plot([r["epoch"] for r in history], [r[key]["cross_entropy"] for r in history], label=label)
+    ax.axhline(result["bigram_held_out"]["cross_entropy"], linestyle="--", color="gray", label="Held-out bigram baseline")
+    ax.set(xlabel="Full-batch updates", ylabel="Next-note cross-entropy (nats)", title="Generalization matters more than memorizing five melodies")
+    ax.legend(frameon=False)
+    fig.savefig(out / "learning-curve.png", dpi=160)
+    plt.close(fig)
+    print(json.dumps({"final": history[-1], "bigram": result["bigram_held_out"], "checkpoint_error": round_trip_error}, indent=2))
+    return result
 
 
 if __name__ == "__main__":
-    melody_preprocessor = MelodyPreprocessor(DATA_PATH, batch_size=BATCH_SIZE)
-    train_dataset = melody_preprocessor.create_training_dataset()
-    vocab_size = melody_preprocessor.number_of_tokens_with_padding
-
-    transformer_model = Transformer(
-        num_layers=2,
-        d_model=64,
-        num_heads=2,
-        d_feedforward=128,
-        input_vocab_size=vocab_size,
-        target_vocab_size=vocab_size,
-        max_num_positions_in_pe_encoder=MAX_POSITIONS_IN_POSITIONAL_ENCODING,
-        max_num_positions_in_pe_decoder=MAX_POSITIONS_IN_POSITIONAL_ENCODING,
-        dropout_rate=0.1,
-    )
-
-    train(train_dataset, transformer_model, EPOCHS)
-
-    print("Generating a melody...")
-    melody_generator = MelodyGenerator(
-        transformer_model, melody_preprocessor.tokenizer
-    )
-    start_sequence = ["C4-1.0", "D4-1.0", "E4-1.0", "C4-1.0"]
-    new_melody = melody_generator.generate(start_sequence)
-    print(f"Generated melody: {new_melody}")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset", default="dataset.json")
+    parser.add_argument("--output", default="results")
+    parser.add_argument("--epochs", type=int, default=200)
+    parser.add_argument("--seed", type=int, default=7)
+    args = parser.parse_args()
+    run(args.dataset, args.output, args.epochs, args.seed)
