@@ -1,1 +1,1 @@
-Curriculum learning can stabilize sequence training.
+Transformers learn long-range musical dependencies via attention.
