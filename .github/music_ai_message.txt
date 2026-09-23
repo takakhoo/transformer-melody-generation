@@ -1,1 +1,1 @@
-Autoregressive decoding enables iterative melody generation.
+Masking focuses loss on musical content, not padding.
