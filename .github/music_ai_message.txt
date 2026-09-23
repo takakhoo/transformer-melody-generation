@@ -1,1 +1,1 @@
-Sinusoidal positional encodings preserve rhythmic structure.
+Autoregressive decoding enables iterative melody generation.
