@@ -1,1 +1,1 @@
-Multi-head attention models harmonic and rhythmic relationships.
+Tokenization maps pitch-duration pairs to discrete IDs.
