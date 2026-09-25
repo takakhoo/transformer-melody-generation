@@ -1,1 +1,1 @@
-MusicAI: Tokenization maps pitch-duration pairs to discrete IDs. — 2026-09-24 16:26:02 UTC
+MusicAI: Temperature controls creativity in sampling new notes. — 2026-09-25 03:16:39 UTC
