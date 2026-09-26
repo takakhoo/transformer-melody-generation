@@ -1,1 +1,1 @@
-Data augmentation improves generalization across styles.
+Curriculum learning can stabilize sequence training.
