@@ -1,1 +1,1 @@
-Beam search balances exploration with coherent melodies.
+Data augmentation improves generalization across styles.
