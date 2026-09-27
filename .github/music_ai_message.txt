@@ -1,1 +1,1 @@
-Transformers learn long-range musical dependencies via attention.
+Sinusoidal positional encodings preserve rhythmic structure.
