@@ -1,1 +1,1 @@
-Temperature controls creativity in sampling new notes.
+Beam search balances exploration with coherent melodies.
