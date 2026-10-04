@@ -1,1 +1,1 @@
-Masking focuses loss on musical content, not padding.
+Multi-head attention models harmonic and rhythmic relationships.
