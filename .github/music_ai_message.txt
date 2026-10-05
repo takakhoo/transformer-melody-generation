@@ -1,1 +1,1 @@
-Tokenization maps pitch-duration pairs to discrete IDs.
+Temperature controls creativity in sampling new notes.
