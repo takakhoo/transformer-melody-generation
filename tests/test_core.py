@@ -44,6 +44,17 @@ class Fingerprint(unittest.TestCase):
         self.assertIn((3, 30), pairs)
 
 
+class CopyFilter(unittest.TestCase):
+    def test_ostinato_is_trivial_and_tune_is_not(self):
+        import importlib
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "experiments"))
+        cp = importlib.import_module("14_copying")
+        loop = np.array([[2, 4], [1, 4], [-1, 4], [-2, 4]] * 6)
+        self.assertTrue(cp.periodic(loop))
+        self.assertFalse(cp.nontrivial(loop))
+        self.assertTrue(cp.nontrivial(interval_rhythm_tokens(tune(5))[:20]))
+
+
 class Tokens(unittest.TestCase):
     def test_roundtrip(self):
         m = tune()

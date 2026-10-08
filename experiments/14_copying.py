@@ -49,9 +49,20 @@ def build_index(train):
     return index
 
 
+def periodic(sym, max_period=8, agree=0.9):
+    """True if the passage is a short cell repeated (an ostinato, trill or sequence loop)."""
+    a = sym[:, 0] * 64 + sym[:, 1]
+    for p in range(1, max_period + 1):
+        if len(a) >= 2 * p and np.mean(a[p:] == a[:-p]) >= agree:
+            return True
+    return False
+
+
 def nontrivial(sym):
+    """A melodic passage: at least four distinct intervals, at most half repeated notes, and not a
+    short cell looped. Repeated notes, trills, ostinati and scale loops occur in thousands of scores."""
     iv = sym[:, 0]
-    return len(np.unique(iv)) >= 4 and np.mean(iv == 0) <= 0.5
+    return len(np.unique(iv)) >= 4 and np.mean(iv == 0) <= 0.5 and not periodic(sym)
 
 
 def strict_copy(m, index):
@@ -149,6 +160,6 @@ if __name__ == "__main__":
         results[tag] = res
         print(tag, json.dumps(res), flush=True)
         out_path.write_text(json.dumps(results, indent=1))
-    keep = [t for t in ("raw_M", "dedup_M") if t in site] or [t for t in ("raw_S", "dedup_S") if t in site]
-    if keep:
+    keep = next(([f"raw_{z}", f"dedup_{z}"] for z in ("M", "S") if f"raw_{z}" in site and f"dedup_{z}" in site), None)
+    if keep:  # the site page compares a raw-trained and a dedup-trained model of the same size
         (ROOT / "site" / "data" / "samples.json").write_text(json.dumps({t: site[t] for t in keep}, separators=(",", ":")))

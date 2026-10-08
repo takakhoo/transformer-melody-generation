@@ -38,23 +38,35 @@ Hooktheory is the control: its artist-stratified split leaks a quarter of what a
 | Transformer 1.8M | 0.026 | [0.012, 0.042] |
 | Transformer 7.4M | 0.060 | [0.039, 0.080] |
 
-On the official test set the 4-gram scores 2.28 nats per note and beats every transformer (best 2.37). On the 49 clean test chorales the larger transformers beat it (2.51 against 2.83). Among transformers the benefit grows with size, so a leaked benchmark flatters exactly the larger models papers report as improvements. On full four-voice piano rolls, in the units of the published JSB results, the leak is worth 0.05 nats per frame at 0.11M parameters and about 0.2 at 1.26M; published models differ by similar amounts (TCN 8.10 vs LSTM 8.45).
+On the official test set the 4-gram scores 2.28 nats per note and beats every transformer (best 2.37). On the 49 clean test chorales the larger transformers beat it (2.51 against 2.83). Among transformers the benefit grows with size, so a leaked benchmark flatters exactly the larger models papers report as improvements. On full four-voice piano rolls, in the units of the published JSB results, the leak is worth 0.055 nats per frame at 0.11M parameters and 0.249 at 1.26M (3 seeds each); published models differ by similar amounts (TCN 8.10 vs LSTM 8.45).
 
 ![Counterfactual leak benefit and the ranking reversal](figures/fig3_counterfactual.png)
 
-**4. No verbatim memorization at melody-model scale, and the leak works anyway.** On PDMX, split by twin family, no model reproduces an inserted canary or a training melody, and the long runs free samples share with training data are repeated notes and trills. See [Memorization](#memorization).
+**4. No verbatim memorization at melody-model scale, and the leak works anyway.** On PDMX, split by twin family, no model up to 7.4M parameters reproduces an inserted canary or a training melody. Transposition augmentation is the reason: switch it off and models prefer the canaries they saw, more with repetition and with size. See [Memorization](#memorization).
 
 ## Memorization
 
-PDMX is split by twin family (no test melody has a relative in training). Each model trains on 30M tokens of either the raw training pool (29,208 melodies, duplicates kept) or the deduplicated one (18,089, one per family), both with 360 synthetic canaries inserted 1 to 32 times.
+PDMX is split by twin family (no test melody has a relative in training). Each model trains on 30M tokens of either the raw training pool (29,208 melodies, duplicates kept) or the deduplicated one (18,089, one per family), both with 360 synthetic canaries inserted 1 to 32 times. Exposure is how much more likely the model finds canaries it saw 32 times than ones it never saw.
 
-| Model | Train data | Test NLL | Canary exposure ×32 | Canaries extracted | Training melodies extracted | Samples with a ≥20-note shared run | Longest non-trivial shared passage |
-|---|---|---:|---:|---:|---:|---:|---:|
-| 0.46M | raw | 2.636 | +0.025 | 0% | 0% | 1% | 15 notes |
-| 1.8M | dedup | 1.877 | +0.023 | 0% | 0% | 8% | 19 notes |
-| 1.8M | raw | 1.777 | +0.031 | 0% | 0% | 22% | 19 notes |
+| Model | Train data | Augmentation | Test NLL | Exposure ×32 (nats/note) | Canaries extracted | Training melodies extracted | Samples with a ≥20-note shared run | Longest melodic shared passage |
+|---|---|---|---:|---:|---:|---:|---:|---:|
+| 0.46M | raw | yes | 2.636 | +0.03 | 0% | 0% | 1% | 15 notes |
+| 1.8M | dedup | yes | 1.877 | +0.02 | 0% | 0% | 8% | 18 |
+| 1.8M | raw | yes | 1.777 | +0.03 | 0% | 0% | 22% | 17 |
+| 7.4M | dedup | yes | 1.521 | +0.09 | 0% | 0% | 24% | 19 |
+| 7.4M | raw | yes | 1.507 | +0.07 | 0% | 0% | 29% | 20 |
+| 1.8M | raw | **no** | 1.658 | **+0.20** | 0% | 0% | 10% | 17 |
+| 7.4M | raw | **no** | 1.442 | **+0.59** | 0% | 0% | 12% | 17 |
+| 1.8M | small raw pool, 13 passes | yes | 2.029 | +0.06 | 0% | 0.7% | 4% | 16 |
+| 1.8M | small raw pool, 13 passes | **no** | 1.777 | **+0.97** | 0% | 0.7% | 9% | 15 |
 
-No model reproduces a canary or a training melody from its opening. The long runs that free samples share with training melodies are repeated notes and trills; deduplication cuts them from 22% to 8% of samples. The longest real melodic passage any sample shares with a training tune is 19 notes. So at this scale the models do not store melodies in a retrievable form, yet they still score leaked test melodies better by an amount that grows with size: a leak inflates a benchmark without any detectable memorization. The strict copy search is [`experiments/14_copying.py`](experiments/14_copying.py).
+![Canary exposure and copying in free samples](figures/fig4_memorization.png)
+
+- **No verbatim recall.** No model reproduces a canary or a training melody from its opening.
+- **Transposition augmentation is what suppresses memorization.** With it, exposure stays near zero even after 400 views of a canary. Without it, models prefer seen canaries in proportion to repetition and model size, as language models do. On PDMX the augmentation also costs likelihood, because key is informative.
+- **Copying in free samples is figuration.** The long runs samples share with training melodies are repeated notes, trills and looped arpeggios. The longest melodic passage any sample shares with a training tune is 15 to 20 notes.
+
+So the transformers in the JSB counterfactual gain from leaked test melodies without storing them: a leak inflates a benchmark with no memorization you could catch by looking for copies. The strict copy search is [`experiments/14_copying.py`](experiments/14_copying.py).
 
 ## Reproduce
 
@@ -70,6 +82,9 @@ python experiments/03_corpus_audit.py # all corpora
 python experiments/07_jsb_soprano_extended.py  # counterfactual, soprano models
 python experiments/04_jsb_counterfactual.py    # counterfactual, four voices
 TRAIN_FRAC=0.15 TOKENS=30e6 python experiments/05_memorization.py XS S M
+CORPORA=raw AUGMENT=0 TRAIN_FRAC=0.15 TOKENS=30e6 python experiments/05_memorization.py S M
+CORPORA=raw TRAIN_FRAC=0.03 TOKENS=30e6 python experiments/05_memorization.py S   # small pool; repeat with AUGMENT=0
+python experiments/14_copying.py
 python experiments/09_figures.py && python experiments/13_memorization_report.py
 ```
 
@@ -84,6 +99,8 @@ python experiments/09_figures.py && python experiments/13_memorization_report.py
 | `10_lsh_recall.py` | Recall of the MinHash stage against exhaustive comparison (0.986 on JSB, 1.0 on Nottingham) |
 | `11_jsb_graph.py` | JSB twin graph and random-split baseline |
 | `12_release.py` | Twin lists and family-level splits in `release/` |
+| `13_memorization_report.py` | Memorization table and figure |
+| `14_copying.py` | Strict copy search in free samples; listening examples for the site |
 
 ## Released files
 

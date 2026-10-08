@@ -13,6 +13,7 @@ import numpy as np  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 M = ROOT / "results" / "memorization"
 DUPS = (1, 2, 4, 8, 16, 32)
+CANARY_COPIES = 60 * sum(DUPS)  # canary insertions counted in train_melodies
 PARAMS = {"XS": "0.46M", "S": "1.8M", "M": "7.4M", "L": "25M"}
 
 
@@ -21,7 +22,7 @@ def label(r):
     if not r.get("augment", True):
         s += ", no aug."
     if r.get("train_frac", 0.15) != 0.15:
-        s += f", {r['train_melodies'] / 1000:.1f}k mel."
+        s += f", small pool ({(r['train_melodies'] - CANARY_COPIES) / 1000:.1f}k)"
     return s
 
 
@@ -54,29 +55,43 @@ def latex(rs):
         lines.append(f"{label(r)} & {r['test_nll_per_note']:.3f} & {r['exposure'][1]:+.3f} & "
                      f"{r['exposure'][32]:+.3f} & {100 * r['canary_extract_x32']:.0f}\\% & {100 * nat:.1f}\\% & {anyrun} & {longest} \\\\")
     lines += [r"\bottomrule", r"\end{tabular}",
-              r"\caption{Memorization on PDMX. \textit{Exposure}: NLL of 60 never-inserted canaries minus NLL of 60 canaries inserted 1, 8 or 32 times, in nats per note (positive means the model prefers the inserted canaries). \textit{Extract}: share of canaries inserted 32 times whose next 20 notes greedy decoding reproduces exactly from a 12-note prompt. \textit{Natural extract}: the highest extraction rate over real training melodies grouped by family size. \textit{Any run}: share of 300 unconditional samples at temperature 0.8 that share a contiguous passage of at least 20 notes with one training melody, up to transposition. \textit{Longest non-trivial}: the longest such passage, in notes, among passages with at least four distinct intervals and at most half repeated notes. Test NLL is on held-out families and is comparable only between runs with the same training pool.}",
+              r"\caption{Memorization on PDMX. \textit{Exposure}: NLL of 60 never-inserted canaries minus NLL of 60 canaries inserted once or 32 times, in nats per note (positive means the model prefers the inserted canaries). \textit{Extract}: share of canaries inserted 32 times whose next 20 notes greedy decoding reproduces exactly from a 12-note prompt. \textit{Natural extract}: the highest extraction rate over real training melodies grouped by family size. \textit{Any run}: share of 300 unconditional samples at temperature 0.8 that share a contiguous passage of at least 20 notes with one training melody, up to transposition. \textit{Longest non-trivial}: the longest such passage, in notes, among melodic passages (at least four distinct intervals, at most half repeated notes, not a looped cell of up to eight notes). Test NLL is on held-out families and is comparable only between runs with the same training pool.}",
               r"\label{tab:mem}", r"\end{table*}"]
     return "\n".join(lines) + "\n"
 
 
 def figure(rs):
+    """Exposure against insertions for the raw-corpus runs, and the share of samples with a shared run."""
     plt.rcParams.update({"font.family": "serif", "font.size": 8, "axes.spines.top": False, "axes.spines.right": False,
                          "legend.frameon": False, "savefig.bbox": "tight", "savefig.dpi": 300})
-    fig, (a, b) = plt.subplots(1, 2, figsize=(6.6, 2.4))
-    cmap = plt.get_cmap("viridis")
-    for k, r in enumerate(rs):
-        style = "-" if r["corpus"] == "raw" else "--"
-        col = cmap(k / max(1, len(rs) - 1))
-        a.plot(DUPS, [r["exposure"][d] for d in DUPS], style, marker="o", ms=3, color=col, label=label(r))
-        b.plot(DUPS, [100 * r[f"canary_extract_x{d}"] for d in DUPS], style, marker="o", ms=3, color=col)
-    for ax in (a, b):
-        ax.set_xscale("log", base=2)
-        ax.set_xticks(DUPS, [str(d) for d in DUPS])
-        ax.set_xlabel("Times a canary is inserted")
+    raw = [r for r in rs if r["corpus"] == "raw"]
+    fig, (a, b) = plt.subplots(1, 2, figsize=(6.6, 2.5), gridspec_kw={"width_ratios": [1.3, 1], "wspace": 0.45})
+    for r in raw:
+        aug = r["augment"]
+        col = {"XS": "#9ecae1", "S": "#3182bd", "M": "#08519c"}[r["size"]] if aug else {"S": "#e6550d", "M": "#a63603"}[r["size"]]
+        style = "--" if r["train_frac"] != 0.15 else "-"
+        a.plot(DUPS, [r["exposure"][d] for d in DUPS], style, marker="o", ms=3, color=col, label=label(r).replace(" raw", ""))
+    a.set_xscale("log", base=2)
+    a.set_xticks(DUPS, [str(d) for d in DUPS])
     a.axhline(0, color="#999", lw=0.6)
+    a.set_xlabel("Times a canary is inserted")
     a.set_ylabel("Exposure (nats/note)")
-    b.set_ylabel("Canaries extracted (%)")
-    a.legend(fontsize=5.8, loc="upper left", ncol=1)
+    a.legend(fontsize=6, loc="upper left")
+    names, anyrun, mel = [], [], []
+    for r in raw:
+        c = r.get("copying")
+        if not c:
+            continue
+        names.append(label(r).replace(" raw", "").replace(" (5.9k)", "").replace(", ", "\n"))
+        anyrun.append(100 * c["strict_run>=20"])
+        mel.append(c["max_nontrivial"])
+    y = np.arange(len(names))[::-1]
+    b.barh(y, anyrun, color="#bdbdbd", height=0.6)
+    for yy, v, m in zip(y, anyrun, mel):
+        b.text(v + 0.8, yy, f"longest melodic: {m}", va="center", fontsize=6)
+    b.set_yticks(y, names, fontsize=6)
+    b.set_xlabel("Samples sharing a 20+ note run (%)")
+    b.set_xlim(0, max(anyrun + [1]) * 1.9)
     fig.savefig(ROOT / "figures" / "fig4_memorization.pdf")
     fig.savefig(ROOT / "figures" / "fig4_memorization.png")
     plt.close(fig)
