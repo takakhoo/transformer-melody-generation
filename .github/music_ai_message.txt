@@ -1,1 +1,0 @@
-Beam search balances exploration with coherent melodies.

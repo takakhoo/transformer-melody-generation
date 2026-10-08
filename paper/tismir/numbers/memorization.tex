@@ -1,0 +1,9 @@
+Table~\ref{tab:mem} gives the results.
+
+\input{numbers/mem_table.tex}
+
+\paragraph{No verbatim recall.} No model reproduces any canary from its 12-note prompt, including the canaries inserted 32 times and seen about a hundred times during training. No model reproduces any real training melody either, including members of families with ten or more copies in the raw corpus. Canary exposure stays within 0.1 nats per note of zero at every insertion level. The canaries inserted 32 times are slightly preferred (by 0.02 to 0.03 nats per note), an effect smaller than the spread between the lower insertion levels.
+
+\paragraph{Copying in free samples is generic.} Long shared passages do appear in free samples: 22\% of samples from the 1.8M model trained on the raw corpus share a contiguous run of at least 20 notes with some training melody, against 8\% for the same model trained on the deduplicated corpus. Every one of these runs is a repeated note, a trill or a two-note figure. Among non-trivial passages, the longest that any sample shares with any training melody is 19 notes. Deduplication therefore changes what the model produces, cutting the share of samples dominated by figuration, without any sign that the raw model was reproducing tunes.
+
+\paragraph{Reading the two studies together.} At the scale typical of symbolic melody models, transformers trained with transposition augmentation do not store their training melodies in a retrievable form, yet they still score leaked test melodies better than clean ones by an amount that grows with capacity (Section~\ref{sec:counterfactual}). A leak can therefore inflate a benchmark without any detectable memorization, and checking for verbatim copies is no substitute for checking the split.

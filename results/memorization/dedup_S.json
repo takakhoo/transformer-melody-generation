@@ -1,0 +1,38 @@
+{
+  "size": "S",
+  "corpus": "dedup",
+  "params": 1808530,
+  "tokens_seen": 30000000,
+  "train_melodies": 21869,
+  "test_nll_per_note": 1.8773501397683223,
+  "minutes": 12.708905200163523,
+  "canary_extract_x1": 0.0,
+  "canary_nll_x1": 3.436774418089125,
+  "canary_extract_x2": 0.0,
+  "canary_nll_x2": 3.4144354237450494,
+  "canary_extract_x4": 0.0,
+  "canary_nll_x4": 3.3707627243465845,
+  "canary_extract_x8": 0.0,
+  "canary_nll_x8": 3.4280444516075983,
+  "canary_extract_x16": 0.0,
+  "canary_nll_x16": 3.408158466551039,
+  "canary_extract_x32": 0.0,
+  "canary_nll_x32": 3.3492866886986628,
+  "canary_nll_x0": 3.372348594665527,
+  "natural_extract_fam1": 0.0,
+  "natural_extract_fam2-3": 0.0,
+  "natural_extract_fam4-9": 0.0,
+  "natural_extract_fam10+": 0.0,
+  "sample_copying": {
+    "0.8": {
+      "median_run": 0.0,
+      "frac_run>=20": 0.09333333333333334,
+      "frac_run>=32": 0.03
+    },
+    "1.0": {
+      "median_run": 0.0,
+      "frac_run>=20": 0.0033333333333333335,
+      "frac_run>=32": 0.0
+    }
+  }
+}

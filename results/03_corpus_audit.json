@@ -1,0 +1,491 @@
+{
+  "hooktheory": {
+    "n": 21881,
+    "with_near_duplicate": 755,
+    "with_transposed_copy": 376,
+    "families": 347,
+    "largest_family": 18,
+    "official_test": {
+      "n": 2289,
+      "twin_in_train": 16,
+      "copy_in_train": 8,
+      "examples": [
+        [
+          "EzngRDraoJj",
+          {
+            "artist": "super-mario-galaxy",
+            "song": "stardust-road"
+          },
+          [
+            [
+              "dPoDjw_qgnM",
+              {
+                "artist": "nintendo",
+                "song": "space-junk-galaxy"
+              },
+              1.0,
+              28
+            ]
+          ]
+        ],
+        [
+          "RzojE-qnxDe",
+          {
+            "artist": "liptsick",
+            "song": "im-a-raver"
+          },
+          [
+            [
+              "ROmNAzyEoNw",
+              {
+                "artist": "lipstick",
+                "song": "im-a-raver"
+              },
+              1.0,
+              82
+            ],
+            [
+              "ZOxVOPaModq",
+              {
+                "artist": "liptick",
+                "song": "im-a-raver"
+              },
+              1.0,
+              82
+            ]
+          ]
+        ],
+        [
+          "AaoGqDPRgeQ",
+          {
+            "artist": "blue-lagoon",
+            "song": "break-my-stride"
+          },
+          [
+            [
+              "nJmBbOK_mAV",
+              {
+                "artist": "matthew-wilder",
+                "song": "break-my-stride"
+              },
+              1.0,
+              50
+            ]
+          ]
+        ],
+        [
+          "ZbgO-NEbonY",
+          {
+            "artist": "ikimono-gakari",
+            "song": "naruto-opening-bluebird"
+          },
+          [
+            [
+              "JkmZkMlZgqn",
+              {
+                "artist": "naruto",
+                "song": "blue-bird-naruto-shippuden"
+              },
+              1.0,
+              48
+            ]
+          ]
+        ],
+        [
+          "veoYONXGgdn",
+          {
+            "artist": "adele",
+            "song": "hello"
+          },
+          [
+            [
+              "kwxAYBMJxKG",
+              {
+                "artist": "adelle",
+                "song": "hello"
+              },
+              1.0,
+              99
+            ]
+          ]
+        ],
+        [
+          "YAg-kVwDole",
+          {
+            "artist": "james-lord-pierpont",
+            "song": "jingle-bells"
+          },
+          [
+            [
+              "RzojwvMQmDe",
+              {
+                "artist": "unko",
+                "song": "jingle-bell"
+              },
+              1.0,
+              46
+            ]
+          ]
+        ],
+        [
+          "VMgJKynWxqK",
+          {
+            "artist": "multiplechain600",
+            "song": "rise-up"
+          },
+          [
+            [
+              "nLgaWkB_oYp",
+              {
+                "artist": "multiplechain60",
+                "song": "rise"
+              },
+              1.0,
+              310
+            ]
+          ]
+        ],
+        [
+          "Abm_JR_Loak",
+          {
+            "artist": "toby-fox",
+            "song": "waterfall"
+          },
+          [
+            [
+              "QLgnd_NPo-V",
+              {
+                "artist": "tobyfox",
+                "song": "waterfall"
+              },
+              1.0,
+              62
+            ]
+          ]
+        ]
+      ]
+    },
+    "official_valid": {
+      "n": 1796,
+      "twin_in_train": 24,
+      "copy_in_train": 13,
+      "examples": [
+        [
+          "wnvgyAG_gkA",
+          {
+            "artist": "so-sick",
+            "song": "ne-yo"
+          },
+          [
+            [
+              "KyvmrlVvxOW",
+              {
+                "artist": "ne-yo",
+                "song": "so-sick"
+              },
+              1.0,
+              37
+            ],
+            [
+              "ANmpBMd-xyM",
+              {
+                "artist": "adrianna-r",
+                "song": "so-sick-ne-yo"
+              },
+              1.0,
+              37
+            ]
+          ]
+        ],
+        [
+          "JNgqBKQexrz",
+          {
+            "artist": "octavia",
+            "song": "marcus-werner"
+          },
+          [
+            [
+              "d_gwQO_boGV",
+              {
+                "artist": "marcus-werner",
+                "song": "octavia"
+              },
+              1.0,
+              29
+            ]
+          ]
+        ],
+        [
+          "nvgyydK_gkA",
+          {
+            "artist": "onerepublic",
+            "song": "counting-stars"
+          },
+          [
+            [
+              "kjDgXnWyoKl",
+              {
+                "artist": "one-republic",
+                "song": "counting-stars"
+              },
+              1.0,
+              19
+            ]
+          ]
+        ],
+        [
+          "d_gwBnBbmGV",
+          {
+            "artist": "mahmood",
+            "song": "turn-down-for-what"
+          },
+          [
+            [
+              "Dpgv_rXOxad",
+              {
+                "artist": "dj-snake-and-lil-jon",
+                "song": "turn-down-for-what"
+              },
+              1.0,
+              54
+            ]
+          ]
+        ],
+        [
+          "RzojWkkkmDe",
+          {
+            "artist": "calvin-harris-alesso",
+            "song": "under-control"
+          },
+          [
+            [
+              "LAgQrABExyO",
+              {
+                "artist": "alesso",
+                "song": "under-control"
+              },
+              1.0,
+              46
+            ]
+          ]
+        ],
+        [
+          "QLgndRPBo-V",
+          {
+            "artist": "fuwarip",
+            "song": "yuyushiki-op---seeno"
+          },
+          [
+            [
+              "dZbgOKPagnY",
+              {
+                "artist": "johoshori-bu",
+                "song": "seeno"
+              },
+              1.0,
+              67
+            ]
+          ]
+        ],
+        [
+          "VMgJAMaWmqK",
+          {
+            "artist": "nmsmusictech",
+            "song": "final"
+          },
+          [
+            [
+              "nLgaWkB_oYp",
+              {
+                "artist": "multiplechain60",
+                "song": "rise"
+              },
+              1.0,
+              310
+            ]
+          ]
+        ],
+        [
+          "dPoDqbAZmnM",
+          {
+            "artist": "elara",
+            "song": "five-nights-at-freddys"
+          },
+          [
+            [
+              "nLgaapzdgYp",
+              {
+                "artist": "the-living-tombstone",
+                "song": "five-nights-at-freddys"
+              },
+              1.0,
+              47
+            ]
+          ]
+        ]
+      ]
+    },
+    "random_split_test_twin_rate": {
+      "mean": 0.028495401738022598,
+      "p5": 0.02350687688695069,
+      "p95": 0.03365755743389412
+    }
+  },
+  "pop909": {
+    "n": 909,
+    "with_near_duplicate": 4,
+    "with_transposed_copy": 2,
+    "families": 2,
+    "largest_family": 2,
+    "random_split_test_twin_rate": {
+      "mean": 0.0031526261377101896,
+      "p5": 0.0,
+      "p95": 0.011904761904761904
+    }
+  },
+  "nottingham": {
+    "n": 1033,
+    "with_near_duplicate": 55,
+    "with_transposed_copy": 16,
+    "families": 27,
+    "largest_family": 3,
+    "random_split_test_twin_rate": {
+      "mean": 0.04415167728141373,
+      "p5": 0.01917832167832168,
+      "p95": 0.0819328802039082
+    }
+  },
+  "essen": {
+    "n": 8382,
+    "with_near_duplicate": 1348,
+    "with_transposed_copy": 707,
+    "families": 632,
+    "largest_family": 6,
+    "random_split_test_twin_rate": {
+      "mean": 0.1323412035100484,
+      "p5": 0.11505250914875391,
+      "p95": 0.1493901637834228
+    }
+  },
+  "pdmx": {
+    "n": 220902,
+    "with_near_duplicate": 118848,
+    "with_transposed_copy": 86661,
+    "families": 34945,
+    "largest_family": 89,
+    "pdmx_dedup_subset": {
+      "n": 75915,
+      "with_transposed_copy_inside_subset": 4733,
+      "with_near_duplicate_inside_subset": 11528,
+      "examples": [
+        [
+          "Morgan Rattler",
+          [
+            [
+              "Morgan Rattler",
+              0.905
+            ]
+          ]
+        ],
+        [
+          "Sovereign of heaven who didst prevail - Charles Stuart Calverley",
+          [
+            [
+              "O Lamb of God - Alassie B. Faussett",
+              1.0
+            ],
+            [
+              "O Lord of Heaven and Earth and Sea",
+              0.688
+            ]
+          ]
+        ],
+        [
+          "Blest Pair Of Sirens (Parry)",
+          [
+            [
+              "Blest Pair Of Sirens (Parry)",
+              1.0
+            ]
+          ]
+        ],
+        [
+          "Goldenhead origin bgm GCCC REMIX",
+          [
+            [
+              "Goldenhead origin bgm no.1",
+              1.0
+            ]
+          ]
+        ],
+        [
+          "Cradled All Lowly - Charles Fran?ois Gounod Dans cette ?table or Cradled All Low",
+          [
+            [
+              "Cradled All Lowly",
+              0.661
+            ],
+            [
+              "Bethlehem - Old French Tune",
+              1.0
+            ]
+          ]
+        ],
+        [
+          "Traditional music - Air d'un branle simple.",
+          [
+            [
+              "Orchesographie - Single Branle",
+              1.0
+            ]
+          ]
+        ],
+        [
+          "Though the foes of right opress - J. Lincoln Hall",
+          [
+            [
+              "Soldier is the battle long? - J. Lincoln Hall",
+              1.0
+            ]
+          ]
+        ],
+        [
+          "Belle qui tiens ma vie (pavane)",
+          [
+            [
+              "Amor que me cautivas",
+              0.426
+            ],
+            [
+              "Pavane",
+              0.511
+            ]
+          ]
+        ],
+        [
+          "Blessed Jesus we implore thee - Timothy Lamb",
+          [
+            [
+              "JUDGMENT (LaTrobe) - Christian Ignatius LaTrobe",
+              1.0
+            ]
+          ]
+        ],
+        [
+          "Pas de deux from The Nutcracker- cello and piano",
+          [
+            [
+              "Pas de deux(from The Nutcracker)",
+              1.0
+            ]
+          ]
+        ]
+      ]
+    },
+    "random_split_test_twin_rate": {
+      "mean": 0.49678593973563456,
+      "p5": 0.49128966928852535,
+      "p95": 0.5023083446602457
+    }
+  }
+}

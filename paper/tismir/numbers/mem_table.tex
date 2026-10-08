@@ -1,0 +1,15 @@
+\begin{table*}[t]
+\centering
+\small
+\begin{tabular}{lrrrrrrr}
+\toprule
+\colhead{Run} & \colhead{Test NLL} & \colhead{Exposure $\times$1} & \colhead{Exposure $\times$32} & \colhead{Extract $\times$32} & \colhead{Natural extract} & \colhead{Any run $\geq$20} & \colhead{Longest non-trivial} \\
+\midrule
+0.46M raw & 2.636 & -0.083 & +0.025 & 0\% & 0.0\% & 1\% & 15 \\
+1.8M dedup & 1.877 & -0.064 & +0.023 & 0\% & 0.0\% & 8\% & 19 \\
+1.8M raw & 1.777 & -0.076 & +0.031 & 0\% & 0.0\% & 22\% & 19 \\
+\bottomrule
+\end{tabular}
+\caption{Memorization on PDMX. \textit{Exposure}: NLL of 60 never-inserted canaries minus NLL of 60 canaries inserted 1, 8 or 32 times, in nats per note (positive means the model prefers the inserted canaries). \textit{Extract}: share of canaries inserted 32 times whose next 20 notes greedy decoding reproduces exactly from a 12-note prompt. \textit{Natural extract}: the highest extraction rate over real training melodies grouped by family size. \textit{Any run}: share of 300 unconditional samples at temperature 0.8 that share a contiguous passage of at least 20 notes with one training melody, up to transposition. \textit{Longest non-trivial}: the longest such passage, in notes, among passages with at least four distinct intervals and at most half repeated notes. Test NLL is on held-out families and is comparable only between runs with the same training pool.}
+\label{tab:mem}
+\end{table*}

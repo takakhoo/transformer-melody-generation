@@ -1,0 +1,39 @@
+{
+ "jsb": {
+  "melodies": 382,
+  "twin_pairs": 224,
+  "train": 306,
+  "valid": 38,
+  "test": 38,
+  "cross_split_test_twins": 0
+ },
+ "jsb_clean_test": 49,
+ "nottingham": {
+  "melodies": 1034,
+  "twin_pairs": 28,
+  "train": 826,
+  "valid": 104,
+  "test": 104,
+  "cross_split_test_twins": 0
+ },
+ "hooktheory": {
+  "melodies": 23560,
+  "twin_pairs": 468
+ },
+ "pop909": {
+  "melodies": 909,
+  "twin_pairs": 2
+ },
+ "essen": {
+  "melodies": 8472,
+  "twin_pairs": 796
+ },
+ "pdmx": {
+  "melodies": 221553,
+  "twin_pairs": 229667,
+  "train": 177241,
+  "valid": 22156,
+  "test": 22156,
+  "cross_split_test_twins": 0
+ }
+}

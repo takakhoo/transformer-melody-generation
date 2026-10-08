@@ -1,0 +1,3 @@
+id_a,id_b,jaccard,longest_common_run,transposition_semitones
+017,018,1.0,222,0
+492,666,0.322,75,0

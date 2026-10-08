@@ -1,0 +1,62 @@
+[
+  {
+    "size": "S",
+    "seed": 0,
+    "A_full_valid": 8.225364032121067,
+    "A_full_test_all": 8.297657108727753,
+    "A_full_test_leaked": 8.23004942714063,
+    "A_full_test_clean": 8.33629006963468,
+    "A_full_params": 111064,
+    "B_no_twins_valid": 8.241024322523662,
+    "B_no_twins_test_all": 8.34316817476306,
+    "B_no_twins_test_leaked": 8.308605774170935,
+    "B_no_twins_test_clean": 8.36291811795856,
+    "B_no_twins_params": 111064,
+    "did_nats_per_frame": 0.051928298706425124
+  },
+  {
+    "size": "S",
+    "seed": 1,
+    "A_full_valid": 8.248122689098254,
+    "A_full_test_all": 8.306412296842934,
+    "A_full_test_leaked": 8.247205406867021,
+    "A_full_test_clean": 8.3402448054006,
+    "A_full_params": 111064,
+    "B_no_twins_valid": 8.265384221968715,
+    "B_no_twins_test_all": 8.332107441528018,
+    "B_no_twins_test_leaked": 8.3118056606033,
+    "B_no_twins_test_clean": 8.34370845919928,
+    "B_no_twins_params": 111064,
+    "did_nats_per_frame": 0.06113659993759768
+  },
+  {
+    "size": "S",
+    "seed": 2,
+    "A_full_valid": 8.233971085261572,
+    "A_full_test_all": 8.323324268054886,
+    "A_full_test_leaked": 8.266625669424732,
+    "A_full_test_clean": 8.355723467272115,
+    "A_full_params": 111064,
+    "B_no_twins_valid": 8.265477166097254,
+    "B_no_twins_test_all": 8.347074397931886,
+    "B_no_twins_test_leaked": 8.322709154313916,
+    "B_no_twins_test_clean": 8.360997394285015,
+    "B_no_twins_params": 111064,
+    "did_nats_per_frame": 0.05080955787628483
+  },
+  {
+    "size": "M",
+    "seed": 0,
+    "A_full_valid": 7.844655433947111,
+    "A_full_test_all": 7.801152101485518,
+    "A_full_test_leaked": 7.436970230084249,
+    "A_full_test_clean": 8.009256028000529,
+    "A_full_params": 1263448,
+    "B_no_twins_valid": 7.987714090201428,
+    "B_no_twins_test_all": 8.029921381268105,
+    "B_no_twins_test_leaked": 7.800817349843519,
+    "B_no_twins_test_clean": 8.160837970653581,
+    "B_no_twins_params": 1263448,
+    "did_nats_per_frame": 0.21226517710621717
+  }
+]

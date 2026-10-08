@@ -1,4 +1,14 @@
 __pycache__/
 *.pyc
 .venv/
-results/*.weights.h5
+data/raw/
+data/melodies/
+results/memorization/*.pt
+results/memorization/*.pkl
+*.log
+paper/tismir/*.aux
+paper/tismir/*.bbl
+paper/tismir/*.blg
+paper/tismir/*.out
+paper/tismir/*.ent
+paper/tismir/*.pdf

@@ -1,26 +1,13 @@
-name: repository-checks
-
-on:
-  push:
-  pull_request:
-
-permissions:
-  contents: read
-
+name: tests
+on: [push, pull_request]
 jobs:
-  train-smoke-test:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-          cache: pip
-      - run: python -m pip install -r requirements.txt
-      - run: python -m compileall -q .
-      - run: python -m unittest -v test_melody
-      - run: python train.py
-      - uses: actions/upload-artifact@v4
-        with:
-          name: melody-experiment
-          path: results/
+      - run: pip install --index-url https://download.pytorch.org/whl/cpu torch==2.8.0
+      - run: pip install numpy==2.5.2 scipy==1.18.0 pytest==8.4.2
+      - run: python -m pytest -q tests

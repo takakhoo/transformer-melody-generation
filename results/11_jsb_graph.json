@@ -1,0 +1,12 @@
+{
+ "n": 381,
+ "with_near_duplicate": 161,
+ "with_transposed_copy": 67,
+ "families": 47,
+ "largest_family": 10,
+ "random_split_test_twin_rate": {
+  "mean": 0.38514943483973096,
+  "p5": 0.26656862745098037,
+  "p95": 0.5135954135954135
+ }
+}

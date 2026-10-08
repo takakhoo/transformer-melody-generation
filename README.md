@@ -1,98 +1,116 @@
-# Transformer melody generation
+# Transposed Twins
 
-A readable TensorFlow next-note model with causal attention, reproducible
-training, saved-model inference, and MIDI export. The experiment also shows
-why a model that memorizes melodies is not necessarily a good composer.
+**Benchmark leakage and memorization in symbolic melody models.**
 
-![Training versus held-out performance](results/learning-curve.png)
+Melody models are scored on how well they predict held-out tunes. But hymn tunes, folk tunes and pop songs exist in many versions, usually in different keys, so a "held-out" melody is often already in the training set under a transposition. This repo builds a transposition- and tempo-invariant twin detector, audits eight melody corpora and their standard splits, measures what the leaks are worth by retraining models without them, and tests whether melody language models copy their training data.
 
-## Reproduce it
+[Paper (PDF)](paper/transposed-twins.pdf) · [Listen to the twins](https://takakhoo.com/melodies) · [Twin lists and clean splits](release/) · Target venue: TISMIR, *Open Music Data* special collection ([why](notes/venue.md))
 
-Python 3.13, CPU, no downloads or API keys beyond package installation:
+![Share of test melodies with a near-duplicate in training](figures/fig1_audit.png)
+
+## Findings
+
+**1. The JSB Chorales benchmark is 36% leaked at the melody level.** 28 of the 77 official test chorales sing a soprano that shares at least half its phrases with a training chorale; 10 are transposed copies. A four-voice fingerprint finds none of them, because Bach harmonized the same hymn tunes more than once and the split separated the settings. The official split leaks as much as a random split would (38.5%).
+
+![A JSB test chorale and its training twin](figures/fig2_jsb_pair.png)
+
+**2. PDMX is half near-duplicates.** 53.8% of its 220,902 public-domain melodies have a twin and 39.2% have a transposed copy. A random split would leak half the test set. Inside PDMX's own deduplicated subset, 6.2% of melodies still have a transposed copy.
+
+| Corpus | Split | Test melodies with a twin in training | Transposed copy |
+|---|---|---:|---:|
+| JSB Chorales (soprano) | official | **36.4%** | 13.0% |
+| PDMX | random 80/10/10 | **49.7%** | |
+| Essen folksongs | random 80/10/10 | 13.2% | |
+| Nottingham | official / random | 2.4% / 4.4% | |
+| MuseData (top voice) | official | 2.4% | 0% |
+| Hooktheory | official, split by artist | 0.7% | 0.35% |
+| Piano-midi.de (top voice) | official | 0% | 0% |
+| POP909 | random 80/10/10 | 0.3% | |
+
+Hooktheory is the control: its artist-stratified split leaks a quarter of what a random split of the same data would (2.8%).
+
+**3. The leak rewards copying and reverses a model ranking.** Every model is trained twice on JSB, with and without the 25 training chorales that twin a test chorale; the leak benefit is the difference in differences between leaked and clean test pieces.
+
+| Model (soprano, 3 seeds) | Leak benefit (nats/note) | 95% CI |
+|---|---:|---|
+| 4-gram | **0.555** | [0.333, 0.784] |
+| Transformer 0.46M | 0.011 | [0.001, 0.020] |
+| Transformer 1.8M | 0.026 | [0.012, 0.042] |
+| Transformer 7.4M | 0.060 | [0.039, 0.080] |
+
+On the official test set the 4-gram scores 2.28 nats per note and beats every transformer (best 2.37). On the 49 clean test chorales the larger transformers beat it (2.51 against 2.83). Among transformers the benefit grows with size, so a leaked benchmark flatters exactly the larger models papers report as improvements. On full four-voice piano rolls, in the units of the published JSB results, the leak is worth 0.05 nats per frame at 0.11M parameters and about 0.2 at 1.26M; published models differ by similar amounts (TCN 8.10 vs LSTM 8.45).
+
+![Counterfactual leak benefit and the ranking reversal](figures/fig3_counterfactual.png)
+
+**4. No verbatim memorization at melody-model scale, and the leak works anyway.** On PDMX, split by twin family, no model reproduces an inserted canary or a training melody, and the long runs free samples share with training data are repeated notes and trills. See [Memorization](#memorization).
+
+## Memorization
+
+PDMX is split by twin family (no test melody has a relative in training). Each model trains on 30M tokens of either the raw training pool (29,208 melodies, duplicates kept) or the deduplicated one (18,089, one per family), both with 360 synthetic canaries inserted 1 to 32 times.
+
+| Model | Train data | Test NLL | Canary exposure ×32 | Canaries extracted | Training melodies extracted | Samples with a ≥20-note shared run | Longest non-trivial shared passage |
+|---|---|---:|---:|---:|---:|---:|---:|
+| 0.46M | raw | 2.636 | +0.025 | 0% | 0% | 1% | 15 notes |
+| 1.8M | dedup | 1.877 | +0.023 | 0% | 0% | 8% | 19 notes |
+| 1.8M | raw | 1.777 | +0.031 | 0% | 0% | 22% | 19 notes |
+
+No model reproduces a canary or a training melody from its opening. The long runs that free samples share with training melodies are repeated notes and trills; deduplication cuts them from 22% to 8% of samples. The longest real melodic passage any sample shares with a training tune is 19 notes. So at this scale the models do not store melodies in a retrievable form, yet they still score leaked test melodies better by an amount that grows with size: a leak inflates a benchmark without any detectable memorization. The strict copy search is [`experiments/14_copying.py`](experiments/14_copying.py).
+
+## Reproduce
+
+Python 3.13 on CPU. Every number in the paper comes from a numbered script in `experiments/`.
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements-reproduce.txt
-python -m unittest -v test_melody
-python train.py --epochs 200 --seed 7
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+bash scripts/fetch_data.sh            # ~11 GB, SHA-256 checked; provenance in data/SOURCES.md
+python -m pytest -q tests
+python experiments/02_jsb_identify.py # JSB audit, exhaustive
+python experiments/03_corpus_audit.py # all corpora
+python experiments/07_jsb_soprano_extended.py  # counterfactual, soprano models
+python experiments/04_jsb_counterfactual.py    # counterfactual, four voices
+TRAIN_FRAC=0.15 TOKENS=30e6 python experiments/05_memorization.py XS S M
+python experiments/09_figures.py && python experiments/13_memorization_report.py
 ```
 
-Outputs in `results/`: numerical history, learning curve, model configuration,
-tokenizer, reloadable weights, and two MIDI files. CI reruns the experiment and
-attaches the complete directory, including weights. Weights are not committed.
-The dependency versions are pinned; GPU/platform floating-point differences may
-still change sampled notes or exact metrics.
+| Script | What it does |
+|---|---|
+| `01_benchmark_leakage_first_look.py` | MinHash pass over the four piano-roll benchmarks (top voice and all voices) |
+| `02_jsb_identify.py` | Exhaustive JSB test/valid vs train comparison; hymn-tune identification against the music21 Bach corpus |
+| `03_corpus_audit.py` | Twin graph, families and 200 random splits per corpus; PDMX dedup-subset check |
+| `04_jsb_counterfactual.py` | Retraining counterfactual on four-voice piano rolls |
+| `06/07_jsb_soprano_*.py` | Retraining counterfactual on soprano lines: 4-gram and three transformer sizes |
+| `05_memorization.py` | PDMX family split, raw vs dedup corpora, canaries, extraction, free-sample copy search |
+| `10_lsh_recall.py` | Recall of the MinHash stage against exhaustive comparison (0.986 on JSB, 1.0 on Nottingham) |
+| `11_jsb_graph.py` | JSB twin graph and random-split baseline |
+| `12_release.py` | Twin lists and family-level splits in `release/` |
 
-**Try the outputs:** [sampled continuation](results/sampled.mid) ·
-[greedy continuation](results/greedy.mid) · [all notes and metrics](results/metrics.json).
-Download a MIDI file and open it in a DAW or notation program. These are small
-educational examples, not claims of production-quality compositions.
+## Released files
 
-## Measured result: memorization is not generalization
+- `release/twins/<corpus>.csv` (PDMX files gzipped): every twin pair with Jaccard score, longest common run and transposition. Essen pairs are identifiers only; its licence forbids redistributing the melodies.
+- `release/splits/jsb_clean_test.txt`: the 49 JSB test chorales with no twin in training. Report this number next to the standard one.
+- `release/splits/*_family_split.json`: 80/10/10 splits that keep each twin family on one side (JSB, Nottingham, PDMX). No test melody has a twin in training.
 
-The six bundled melodies are split by **whole melody**, never by overlapping
-windows. Melody 0 is held out; the other five provide the vocabulary and training
-examples. Melody 0 was chosen because its note tokens are present in the training
-vocabulary. There is no tuning or checkpoint selection on held-out scores.
+## How the detector works
 
-| Model / evaluation | Next-note cross-entropy ↓ | Perplexity ↓ | Accuracy ↑ |
-|---|---:|---:|---:|
-| Transformer, training melodies, update 200 | 0.072 | 1.07 | 97.0% |
-| Transformer, held-out melody, update 200 | 5.987 | 398.19 | 14.8% |
-| Add-one-smoothed bigram, same held-out melody | 2.379 | 10.80 | 37.0% |
+Each note becomes a pair (pitch interval to the previous note, quantized ratio of successive inter-onset intervals), which ignores key and tempo. Melodies are shingled into 8-symbol phrases, MinHash with 32 bands of 4 rows proposes candidates, and every candidate is verified exactly by shingle Jaccard and longest common run. A twin shares half its phrases or 12 consecutive symbols; a transposed copy has Jaccard of at least 0.9. Code in [`src/melody/dedup.py`](src/melody/dedup.py) and [`src/melody/representation.py`](src/melody/representation.py).
 
-Seed 7, one full batch per update, one layer per stack, width 32, two heads,
-dropout 0.1, Adam learning rate 0.003 with norm clipping. The fixed 200-update
-run intentionally exposes overfitting. These results cover only **one held-out
-tune**, not a statistically reliable music benchmark. The next research step is
-a larger, licensed melody corpus with separate validation and test sets, not
-increasing model size on these six examples.
+## Data and licences
 
-## Correctness improvements
+Code is MIT. Corpora are not redistributed; `scripts/fetch_data.sh` downloads them from their pinned sources. PDMX scores are public domain or CC0. Essen is CCARH-licensed (no redistribution). Hooktheory is CC BY-NC-SA 3.0. The Session and IrishMAN are excluded on purpose: The Session's licence forbids processing its tunes with language-model tools.
 
-- **Exactly one target shift.** At position t, the label is the next note, not
-  the note two steps ahead. Each tune contributes one right-padded example.
-- **No future-token leakage.** Both encoder and decoder self-attention are
-  causal, as is cross-attention. Because both stacks read the same prefix, a
-  conventional bidirectional translation encoder would leak future labels.
-- Padding cannot become a sampled note; padded targets do not enter the loss.
-- Attention head width is `d_model / num_heads`, and sinusoidal dimensions
-  alternate sine/cosine, including for odd widths.
-- Seeded top-k sampling, greedy decoding, known-token and length validation.
-- Checkpoint + tokenizer + architecture round trip reproduces logits exactly
-  in the reference run (maximum absolute difference **0**).
+## History
 
-Seven tests cover causality through both stacks, padding invariance, label
-alignment, positional encoding, seeded generation, checkpoint reload, and MIDI
-pitches/timing. The original architecture's weights are not compatible with the
-corrected head dimensions; retrain instead of silently loading old checkpoints.
+This repository started in September 2025 as a small TensorFlow next-note transformer trained on six melodies, whose one honest result was that the model memorized its training tunes and lost to a bigram on a held-out one. That code lives in [`legacy/`](legacy/). The research here takes the same question, memorization against generalization, to real corpora and real benchmarks.
 
-## Generate from saved weights
+## Citation
 
-```python
-from train import load_artifact
-from melodygenerator import MelodyGenerator, write_midi
-
-model, tokenizer = load_artifact("results")
-generator = MelodyGenerator(model, tokenizer, max_length=32)
-notes = generator.generate(["C4-1.0", "D4-1.0", "E4-1.0"],
-                           temperature=0.8, top_k=5, seed=19)
-write_midi(notes.split(), "results/my-melody.mid", bpm=100)
+```bibtex
+@misc{khoo2026twins,
+  title  = {Transposed Twins: Benchmark Leakage and Memorization in Symbolic Melody Models},
+  author = {Khoo, Taka},
+  year   = {2026},
+  note   = {Manuscript prepared for TISMIR},
+  url    = {https://github.com/takakhoo/transformer-melody-generation}
+}
 ```
-
-The representation is `pitch-duration`, with duration in quarter-note beats.
-There are no rests, polyphony, expressive timing, or end-of-sequence token yet;
-generation stops at the requested length.
-
-## Files and attribution
-
-- `transformer.py`: causal two-stack architecture and positional encoding.
-- `melodypreprocessor.py`: explicit note vocabulary and shifted pairs.
-- `train.py`: fixed split, baseline, evaluation, checkpoint and experiment.
-- `melodygenerator.py`: inference and MIDI export.
-- `dataset.json`: the original six symbolic melody examples.
-
-Based on melody-generation material from
-[The Sound of AI](https://www.youtube.com/@ValerioVelardoTheSoundofAI).
-Mask semantics follow the [Keras MultiHeadAttention documentation](https://keras.io/api/layers/attention_layers/multi_head_attention/).
