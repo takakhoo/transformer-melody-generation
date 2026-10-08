@@ -4,7 +4,7 @@
 
 Melody models are scored on how well they predict held-out tunes. But hymn tunes, folk tunes and pop songs exist in many versions, usually in different keys, so a "held-out" melody is often already in the training set under a transposition. This repo builds a transposition- and tempo-invariant twin detector, audits eight melody corpora and their standard splits, measures what the leaks are worth by retraining models without them, and tests whether melody language models copy their training data.
 
-[Paper (PDF)](paper/transposed-twins.pdf) · [Listen to the twins](https://takakhoo.com/melodies) · [Twin lists and clean splits](release/) · Target venue: TISMIR, *Open Music Data* special collection ([why](notes/venue.md))
+[Paper (PDF)](paper/transposed-twins.pdf) · [Listen to the twins](https://takakhoo.com/melodies) · [Twin lists and clean splits](release/) · Manuscript in preparation for TISMIR, *Open Music Data* special collection; not yet peer reviewed ([venue notes](notes/venue.md))
 
 ![Share of test melodies with a near-duplicate in training](figures/fig1_audit.png)
 
@@ -127,7 +127,7 @@ This repository started in September 2025 as a small TensorFlow next-note transf
   title  = {Transposed Twins: Benchmark Leakage and Memorization in Symbolic Melody Models},
   author = {Khoo, Taka},
   year   = {2026},
-  note   = {Manuscript prepared for TISMIR},
+  note   = {Manuscript in preparation for TISMIR},
   url    = {https://github.com/takakhoo/transformer-melody-generation}
 }
 ```
